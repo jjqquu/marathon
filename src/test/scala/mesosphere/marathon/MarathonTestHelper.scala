@@ -481,13 +481,18 @@ object MarathonTestHelper {
       .buildPartial()
   }
 
-  def persistentVolumeResources(localVolumeIds: Task.LocalVolumeId*) = localVolumeIds.map { id =>
+  def persistentVolumeResources(taskId: Task.Id, localVolumeIds: Task.LocalVolumeId*) = localVolumeIds.map { id =>
     Mesos.Resource.newBuilder()
       .setName("disk")
       .setType(Mesos.Value.Type.SCALAR)
       .setScalar(Mesos.Value.Scalar.newBuilder().setValue(10))
       .setRole("test")
-      .setReservation(Mesos.Resource.ReservationInfo.newBuilder().setPrincipal("principal"))
+      .setReservation(
+        Mesos.Resource.ReservationInfo
+          .newBuilder()
+          .setPrincipal("principal")
+          .setLabels(TaskLabels.mesosLabelsForTask(taskId))
+      )
       .setDisk(Mesos.Resource.DiskInfo.newBuilder()
         .setPersistence(Mesos.Resource.DiskInfo.Persistence.newBuilder().setId(id.idString))
         .setVolume(Mesos.Volume.newBuilder()
@@ -501,14 +506,14 @@ object MarathonTestHelper {
     MarathonTestHelper.makeBasicOffer(
       reservation = Some(TaskLabels.labelsForTask(Task.Id(taskId))),
       role = "test"
-    ).addAllResources(persistentVolumeResources(localVolumeIds: _*).asJava).build()
+    ).addAllResources(persistentVolumeResources(Task.Id(taskId), localVolumeIds: _*).asJava).build()
   }
 
-  def offerWithVolumesOnly(localVolumeIds: Task.LocalVolumeId*) = {
+  def offerWithVolumesOnly(taskId: Task.Id, localVolumeIds: Task.LocalVolumeId*) = {
     import scala.collection.JavaConverters._
     MarathonTestHelper.makeBasicOffer()
       .clearResources()
-      .addAllResources(persistentVolumeResources(localVolumeIds: _*).asJava)
+      .addAllResources(persistentVolumeResources(taskId, localVolumeIds: _*).asJava)
       .build()
   }
 

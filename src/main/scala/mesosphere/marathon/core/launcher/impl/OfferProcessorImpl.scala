@@ -121,10 +121,15 @@ private[launcher] class OfferProcessorImpl(
   private[this] def saveTasks(ops: Seq[TaskOpWithSource], savingDeadline: Timestamp): Future[Seq[TaskOpWithSource]] = {
     def saveTask(taskOpWithSource: TaskOpWithSource): Future[Option[TaskOpWithSource]] = {
       val taskId = taskOpWithSource.taskId
-      log.info("Save task [{}]", taskOpWithSource.taskId)
-      taskCreationHandler
-        .created(taskOpWithSource.op.newTask)
-        .map(_ => Some(taskOpWithSource))
+      val persistedOp = taskOpWithSource.op.maybeNewTask match {
+        case Some(newTask) =>
+          log.info("Save {}", taskOpWithSource.taskId)
+          taskCreationHandler.created(newTask)
+        case None =>
+          log.info("Remove {}", taskOpWithSource.taskId)
+          taskCreationHandler.terminated(taskId)
+      }
+      persistedOp.map(_ => Some(taskOpWithSource))
         .recoverWith {
           case NonFatal(e) =>
             savingTasksErrorMeter.mark()
