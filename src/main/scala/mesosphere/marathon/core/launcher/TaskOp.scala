@@ -1,5 +1,6 @@
 package mesosphere.marathon.core.launcher
 
+import mesosphere.marathon.core.launcher.impl.TaskLabels
 import mesosphere.marathon.core.task.Task
 import mesosphere.marathon.core.task.Task.LocalVolume
 import mesosphere.marathon.tasks.ResourceUtil
@@ -13,7 +14,10 @@ sealed trait TaskOp {
   def taskId: Task.Id
   /** The MarathonTask state before this operation has been applied. */
   def oldTask: Option[Task]
-  /** The MarathonTask state after this operation has been applied. */
+  /**
+    * The MarathonTask state after this operation has been applied.
+    * `None` means that the associated task should be expunged.
+    */
   def maybeNewTask: Option[Task]
   /** How would the offer change when Mesos executes this op? */
   def applyToOffer(offer: MesosProtos.Offer): MesosProtos.Offer
@@ -57,6 +61,11 @@ object TaskOp {
       maybeNewTask: Option[Task] = None,
       resources: Iterable[MesosProtos.Resource],
       oldTask: Option[Task] = None) extends TaskOp {
+
+    require(
+      resources.forall(TaskLabels.taskIdForResource(_).isDefined),
+      s"tried to apply an unreserve operation on resources without labels: $resources"
+    )
 
     override lazy val offerOperations: Iterable[MesosProtos.Offer.Operation] = {
       val (withDisk, withoutDisk) = resources.partition(_.hasDisk)

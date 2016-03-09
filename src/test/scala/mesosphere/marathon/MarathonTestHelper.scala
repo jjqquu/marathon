@@ -9,7 +9,7 @@ import com.github.fge.jsonschema.main.JsonSchemaFactory
 import mesosphere.marathon.Protos.MarathonTask
 import mesosphere.marathon.api.JsonTestHelper
 import mesosphere.marathon.core.base.Clock
-import mesosphere.marathon.core.launcher.impl.TaskLabels
+import mesosphere.marathon.core.launcher.impl.{ ResourceLabels, TaskLabels }
 import mesosphere.marathon.core.leadership.LeadershipModule
 import mesosphere.marathon.core.task.{ TaskStateOp, Task }
 import mesosphere.marathon.core.task.tracker.impl.TaskSerializer
@@ -66,18 +66,14 @@ object MarathonTestHelper {
 
   def makeBasicOffer(cpus: Double = 4.0, mem: Double = 16000, disk: Double = 1.0,
                      beginPort: Int = 31000, endPort: Int = 32000, role: String = "*",
-                     reservation: Option[Map[String, String]] = None): Offer.Builder = {
+                     reservation: Option[ResourceLabels] = None): Offer.Builder = {
 
     require(role != "*" || reservation.isEmpty, "reserved resources cannot have role *")
 
     def heedReserved(resource: Mesos.Resource): Mesos.Resource = {
       reservation match {
         case Some(reservationLabels) =>
-          val labels = Mesos.Labels.newBuilder()
-          reservationLabels.foreach {
-            case (k, v) =>
-              labels.addLabels(Mesos.Label.newBuilder().setKey(k).setValue(v))
-          }
+          val labels = reservationLabels.mesosLabels
           val reservation =
             Mesos.Resource.ReservationInfo.newBuilder()
               .setPrincipal("marathon")
@@ -491,7 +487,7 @@ object MarathonTestHelper {
         Mesos.Resource.ReservationInfo
           .newBuilder()
           .setPrincipal("principal")
-          .setLabels(TaskLabels.mesosLabelsForTask(taskId))
+          .setLabels(TaskLabels.labelsForTask(taskId).mesosLabels)
       )
       .setDisk(Mesos.Resource.DiskInfo.newBuilder()
         .setPersistence(Mesos.Resource.DiskInfo.Persistence.newBuilder().setId(id.idString))
