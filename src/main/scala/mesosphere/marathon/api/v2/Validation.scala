@@ -40,6 +40,11 @@ object Validation {
     }
   }
 
+  implicit lazy val resultWrites: Writes[Result] = Writes {
+    case f: Failure => failureWrites.writes(f)
+    case Success    => Json.obj("message" -> "Object is valid")
+  }
+
   implicit lazy val failureWrites: Writes[Failure] = Writes { f =>
     Json.obj(
       "message" -> "Object is not valid",

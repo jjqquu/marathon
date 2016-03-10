@@ -1,5 +1,6 @@
 package mesosphere.marathon.state
 
+import mesosphere.marathon.api.v2.Validation.isTrue
 import mesosphere.marathon.plugin
 
 import scala.language.implicitConversions
@@ -105,37 +106,37 @@ object PathId {
     * For external usage. Needed to overwrite the whole description, e.g. id.path -> id.
     * @return
     */
-  implicit def pathIdValidator: Validator[PathId] = {
-    new Validator[PathId] {
+  implicit val pathIdValidator = new Validator[PathId] {
+    val pathIdValidChars: Validator[PathId] = new Validator[PathId] {
       override def apply(pathId: PathId): Result = {
-        validate(pathId.path)(validator = pathId.path.each should matchRegexFully(ID_PATH_SEGMENT_PATTERN.pattern)) and
-          validChild(pathId)
+        validate(pathId.path)(validator = pathId.path.each should matchRegexFully(ID_PATH_SEGMENT_PATTERN.pattern))
       }
     }
+
+    def validChild: Validator[PathId] = {
+      new Validator[PathId] {
+        override def apply(pathId: PathId): Result = {
+          if (pathId.parent == "".toPath) Success
+          else if (pathId.parent.absolute) {
+            isTrue[PathId](s"""Identifier $pathId is not child of ${pathId.parent}.
+                       |Hint: use relative paths.""".
+              stripMargin) { pathId =>
+              val p = pathId.canonicalPath(pathId.parent)
+              pathId.parent == PathId.empty || p.parent == pathId.parent
+            }(pathId)
+          }
+          else Failure(Set(RuleViolation(pathId.parent, "Path of parent should be absolute.", None)))
+        }
+      }
+    }
+
+    override def apply(path: PathId): Result =
+      pathIdValidChars(path) and validChild(path)
   }
 
-  /**
-    * Check if path's parent, if it exists, is a valid parent indeed.
-    * @return
-    */
-  private def validChild: Validator[PathId] = {
-    new Validator[PathId] {
-      override def apply(pathId: PathId): Result = {
-        if (pathId.parent == "".toPath) Success
-        else if (pathId.parent.absolute) {
-          val p = pathId.canonicalPath(pathId.parent)
-          if (pathId.parent != PathId.empty && p.parent != pathId.parent) Failure(Set(
-            RuleViolation(pathId,
-              s"""Identifier $pathId is not child of ${pathId.parent}.
-                    |Actual parent: ${p.parent}.
-                    |Hint: use relative paths.""".
-                stripMargin, None)
-          )
-          )
-          else Success
-        }
-        else Failure(Set(RuleViolation(pathId.parent, "Path of parent should be absolute.", None)))
-      }
+  def dependencyExistsIn(ids: Set[PathId], base: PathId): Validator[PathId] =
+    isTrue[PathId]("dependency definition does not exist in group's tree") { path =>
+      val canonicalPath = path.canonicalPath(base)
+      ids.contains(canonicalPath)
     }
-  }
 }

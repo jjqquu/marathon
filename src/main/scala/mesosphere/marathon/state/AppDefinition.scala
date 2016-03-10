@@ -488,7 +488,6 @@ object AppDefinition {
     */
   implicit val appDefinitionValidator = validator[AppDefinition] { appDef =>
     appDef.id is valid
-    appDef.dependencies is valid
     appDef.upgradeStrategy is valid
     appDef.container.each is valid
     appDef.storeUrls is every(urlCanBeResolvedValidator)
@@ -553,5 +552,9 @@ object AppDefinition {
         }
       }
     }
+  }
+
+  def dependenciesAreValid(ids: Set[PathId], base: PathId): Validator[AppDefinition] = validator[AppDefinition] { app =>
+    app.dependencies is every(PathId.dependencyExistsIn(ids, base))
   }
 }

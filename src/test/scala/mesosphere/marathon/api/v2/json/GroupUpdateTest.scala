@@ -16,16 +16,13 @@ class GroupUpdateTest extends FunSuite with Matchers with GivenWhenThen {
       )),
       GroupUpdate(
         "apps".toPath,
-        Set(AppDefinition("app1".toPath, Some("foo"),
-          dependencies = Set("d1".toPath, "../test/foo".toPath, "/test".toPath)))
-      )
-    )
-    )
+        Set(AppDefinition("d1".toPath, Some("d1")),
+          AppDefinition("app1".toPath, Some("foo"),
+            dependencies = Set("d1".toPath, "../test/foo".toPath, "/test".toPath))))))
     val timestamp = Timestamp.now()
 
     When("The update is performed")
     val result = update(group, timestamp)
-
     validate(result).isSuccess should be(true)
 
     Then("The update is applied correctly")
@@ -36,9 +33,9 @@ class GroupUpdateTest extends FunSuite with Matchers with GivenWhenThen {
     test.get.groups should have size 1
     val apps = result.group("apps".toRootPath)
     apps should be('defined)
-    apps.get.apps should have size 1
-    val app = apps.get.apps.head
-    app.id.toString should be ("/apps/app1")
+    apps.get.apps should have size 2
+    val app = apps.get.apps.find(_.id == "/apps/app1".toPath)
+      .getOrElse(fail("/app/app1 not found"))
     app.dependencies should be (Set("/apps/d1".toPath, "/test/foo".toPath, "/test".toPath))
   }
 
@@ -59,8 +56,9 @@ class GroupUpdateTest extends FunSuite with Matchers with GivenWhenThen {
         ),
         GroupUpdate(
           "apps".toPath,
-          Set(AppDefinition("app1".toPath, Some("foo"),
-            dependencies = Set("d1".toPath, "../test/foo".toPath, "/test".toPath)))
+          Set(AppDefinition("d1".toPath, Some("d1")),
+            AppDefinition("app1".toPath, Some("foo"),
+              dependencies = Set("d1".toPath, "../test/foo".toPath, "/test".toPath)))
         )
       )
     )
@@ -81,9 +79,8 @@ class GroupUpdateTest extends FunSuite with Matchers with GivenWhenThen {
     val apps = result.group("apps".toRootPath)
     apps should be('defined)
     apps.get.groups should have size 1
-    apps.get.apps should have size 1
-    val app = apps.get.apps.head
-    app.id.toString should be ("/apps/app1")
+    apps.get.apps should have size 2
+    val app = apps.get.apps.find(_.id == "/apps/app1".toPath).getOrElse(fail("/apps/app1 not found"))
     app.dependencies should be (Set("/apps/d1".toPath, "/test/foo".toPath, "/test".toPath))
   }
 

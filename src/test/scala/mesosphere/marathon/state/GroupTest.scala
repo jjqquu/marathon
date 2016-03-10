@@ -396,5 +396,121 @@ class GroupTest extends FunSpec with GivenWhenThen with Matchers {
       Then("All non existing subgroups should be created")
       ids should equal(reference.transitiveGroups.map(_.id))
     }
+
+    it("can contain apps with relative dependencies which have correct absolute relation to an app") {
+      Given("app with a relative dependency to an existing app")
+      val group: Group = Group("/product".toPath, groups = Set(
+        Group("database".toPath, apps = Set(AppDefinition("mongo".toPath, cmd = Some("foo")))),
+        Group("service".toPath, apps = Set(AppDefinition("rails-app".toPath, cmd = Some("bar"),
+          dependencies = Set("../database/mongo".toPath))))
+      ))
+
+      When("validating the group")
+      val result = validate(group)
+
+      Then("the result should be a success.")
+      result.isSuccess should be(true)
+    }
+
+    it("cannot contain apps with relative dependencies which have no correct absolute relation to an app") {
+      Given("app with a relative dependency to a not existing app")
+      val group: Group = Group("/product".toPath, groups = Set(
+        Group("database".toPath, apps = Set(AppDefinition("mongo".toPath, cmd = Some("foo")))),
+        Group("service".toPath, apps = Set(AppDefinition("rails-app".toPath, cmd = Some("bar"),
+          dependencies = Set("../database/neo4j".toPath))))
+      ))
+
+      When("validating the group")
+      val result = validate(group)
+
+      Then("the result should be a failure.")
+      result.isFailure should be(true)
+    }
+
+    it("can contain apps with relative dependencies which have correct absolute relation to an group") {
+      Given("app with a relative dependency to an existing group")
+      val group: Group = Group("/product".toPath, groups = Set(
+        Group("database".toPath, apps = Set(AppDefinition("mongo".toPath, cmd = Some("foo")))),
+        Group("service".toPath, apps = Set(AppDefinition("rails-app".toPath, cmd = Some("bar"),
+          dependencies = Set("../database".toPath))))
+      ))
+
+      When("validating the group")
+      val result = validate(group)
+
+      Then("the result should be a success.")
+      result.isSuccess should be(true)
+    }
+
+    it("cannot contain apps with relative dependencies which have no correct absolute relation to an group") {
+      Given("app with a relative dependency to a not existing group")
+      val group: Group = Group("/product".toPath, groups = Set(
+        Group("database".toPath, apps = Set(AppDefinition("mongo".toPath, cmd = Some("foo")))),
+        Group("service".toPath, apps = Set(AppDefinition("rails-app".toPath, cmd = Some("bar"),
+          dependencies = Set("../backup".toPath))))
+      ))
+
+      When("validating the group")
+      val result = validate(group)
+
+      Then("the result should be a failure.")
+      result.isFailure should be(true)
+    }
+
+    it("can contain groups with relative dependencies which have correct absolute relation to a group") {
+      Given("group with a relative dependency to an existing group")
+      val group: Group = Group("/product".toPath, groups = Set(
+        Group("database".toPath),
+        Group("service".toPath, dependencies = Set("../database".toPath)))
+      )
+
+      When("validating the group")
+      val result = validate(group)
+
+      Then("the result should be a success.")
+      result.isSuccess should be(true)
+    }
+
+    it("cannot contain groups with relative dependencies which have no correct absolute relation to a group") {
+      Given("group with a relative dependency to a not existing group")
+      val group: Group = Group("/product".toPath, groups = Set(
+        Group("database".toPath),
+        Group("service".toPath, dependencies = Set("../backup".toPath)))
+      )
+
+      When("validating the group")
+      val result = validate(group)
+
+      Then("the result should be a failure.")
+      result.isFailure should be(true)
+    }
+
+    it("can contain groups with relative dependencies which have correct absolute relation to an app") {
+      Given("group with a relative dependency to an existing app")
+      val group: Group = Group("/product".toPath, groups = Set(
+        Group("database".toPath, apps = Set(AppDefinition("mongo".toPath, cmd = Some("foo")))),
+        Group("service".toPath, dependencies = Set("../database/mongo".toPath))
+      ))
+
+      When("validating the group")
+      val result = validate(group)
+
+      Then("the result should be a success.")
+      result.isSuccess should be(true)
+    }
+
+    it("cannot contain groups with relative dependencies which have wrong absolute relation to an app") {
+      Given("group with a relative dependency to a not existing app")
+      val group: Group = Group("/product".toPath, groups = Set(
+        Group("database".toPath, apps = Set(AppDefinition("mongo".toPath, cmd = Some("foo")))),
+        Group("service".toPath, dependencies = Set("../database/neo4j".toPath))
+      ))
+
+      When("validating the group")
+      val result = validate(group)
+
+      Then("the result should be a failure.")
+      result.isFailure should be(true)
+    }
   }
 }

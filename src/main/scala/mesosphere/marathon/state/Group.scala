@@ -121,6 +121,15 @@ case class Group(
 
   lazy val transitiveAppGroups: Set[Group] = transitiveGroups.filter(_.apps.nonEmpty)
 
+  lazy val transitiveIds: Set[PathId] = {
+    def transitiveCanonicalIds(group: Group, parent: PathId = PathId.empty): Set[PathId] = {
+      val base = group.id.canonicalPath(parent)
+      group.apps.map(_.id.canonicalPath(base)) ++ group.groups.flatMap(g => transitiveCanonicalIds(g, base)) + base
+    }
+
+    transitiveCanonicalIds(this)
+  }
+
   lazy val applicationDependencies: List[(AppDefinition, AppDefinition)] = {
     var result = List.empty[(AppDefinition, AppDefinition)]
     val allGroups = transitiveGroups
@@ -210,14 +219,24 @@ object Group {
   def defaultDependencies: Set[PathId] = Set.empty
   def defaultVersion: Timestamp = Timestamp.now()
 
-  implicit val groupValidator: Validator[Group] = validator[Group] { group =>
-    group.id is valid
-    group.apps is valid
-    group.groups is valid
-    group is noAppsAndGroupsWithSameName
-    (group.id.isRoot is false) or (group.dependencies is noCyclicDependencies(group))
+  private def groupValidatorWithBase(base: PathId, transitiveIds: Set[PathId]): Validator[Group] =
+    validator[Group] { group =>
+      group.id is valid
+      group.apps is every(AppDefinition.dependenciesAreValid(transitiveIds, group.id.canonicalPath(base)))
+      group.apps is valid
+      group is noAppsAndGroupsWithSameName
+      (group.id.isRoot is false) or (group.dependencies is noCyclicDependencies(group))
+      group is validPorts
 
-    group is validPorts
+      group.dependencies is every(dependencyExistsIn(transitiveIds, group.id.canonicalPath(base)))
+      group.groups is every(valid(groupValidatorWithBase(group.id.canonicalPath(base), transitiveIds)))
+    }
+
+  implicit val groupValidator: Validator[Group] = new Validator[Group] {
+    override def apply(group: Group): Result = {
+      com.wix.accord.validate(group)(validator =
+        groupValidatorWithBase(PathId.empty, group.transitiveIds))
+    }
   }
 
   def validWithConfig(maxApps: Option[Int])(implicit validator: Validator[Group]): Validator[Group] = {
